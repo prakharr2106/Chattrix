@@ -6,89 +6,110 @@ const router = express.Router();
 
 // Handle POST requests sent by Clerk
 router.post("/", async (req, res) => {
+  console.log("========== WEBHOOK RECEIVED ==========");
+
   try {
     const signingSecret = process.env.CLERK_WEBHOOK_SIGNING_SECRET;
 
+    console.log("Signing Secret Exists:", !!signingSecret);
+
     if (!signingSecret) {
-      res.status(503).json({ message: "Webhook secret is not provided" });
-      return;
+      console.log("Webhook secret missing!");
+      return res
+        .status(503)
+        .json({ message: "Webhook secret is not provided" });
     }
 
-    // Express stores the raw body as a Buffer.
-    // Convert it into a string because Clerk expects a Web Request object.
+    // Convert raw Buffer to string
     const payload = Buffer.isBuffer(req.body)
       ? req.body.toString("utf8")
       : String(req.body);
 
-    // Create a standard Web Request object for Clerk verification
+    console.log("Payload received.");
+
+    // Create Web Request object
     const request = new Request("http://internal/webhooks/clerk", {
       method: "POST",
       headers: new Headers(req.headers),
       body: payload,
     });
 
-    // Verify that the request actually came from Clerk.
-    // If verification fails, an error is thrown.
+    console.log("Verifying webhook...");
+
+    // Verify Clerk signature
     const evt = await verifyWebhook(request, { signingSecret });
+
+    console.log("Webhook verified successfully!");
+    console.log("Event Type:", evt.type);
 
     // ============================
     // Handle user creation/update
     // ============================
     if (evt.type === "user.created" || evt.type === "user.updated") {
+      console.log("Processing user create/update...");
+
       const u = evt.data;
 
-      // Find the user's primary email.
-      // If there is no primary email, use the first available email.
       const email =
         u.email_addresses?.find((e) => e.id === u.primary_email_address_id)
           ?.email_address ?? u.email_addresses?.[0]?.email_address;
 
-      // Create the user's display name.
-      // Priority:
-      // 1. First + Last name
-      // 2. Username
-      // 3. Part before '@' in the email
       const fullName =
         [u.first_name, u.last_name].filter(Boolean).join(" ") ||
         u.username ||
         email?.split("@")[0];
 
-      // Update the existing user if found.
-      // Otherwise create a new one (upsert = update + insert).
-      await User.findOneAndUpdate(
-        { clerkId: u.id }, // Search using Clerk user ID
+      console.log("User Data:");
+      console.log({
+        clerkId: u.id,
+        email,
+        fullName,
+        profilePic: u.image_url,
+      });
 
-        // Data to store in MongoDB
+      const savedUser = await User.findOneAndUpdate(
+        { clerkId: u.id },
         {
           clerkId: u.id,
           email,
           fullName,
           profilePic: u.image_url,
         },
-
         {
-          new: true,                // Return updated document
-          upsert: true,             // Create document if it doesn't exist
-          setDefaultsOnInsert: true // Apply default values when inserting
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
         },
       );
+
+      console.log("User saved to MongoDB:");
+      console.log(savedUser);
     }
 
     // ============================
     // Handle user deletion
     // ============================
     if (evt.type === "user.deleted") {
-      // Delete the user from MongoDB using Clerk ID
-      if (evt.data.id)
-        await User.findOneAndDelete({ clerkId: evt.data.id });
+      console.log("Processing user deletion...");
+
+      if (evt.data.id) {
+        const deletedUser = await User.findOneAndDelete({
+          clerkId: evt.data.id,
+        });
+
+        console.log("Deleted user:");
+        console.log(deletedUser);
+      }
     }
 
-    // Tell Clerk the webhook was processed successfully
-    res.status(200).json({ received: true });
+    console.log("Webhook completed successfully.");
+    console.log("=====================================");
 
+    res.status(200).json({ received: true });
   } catch (error) {
-    // Verification failed or some other error occurred
-    console.error("Error in Clerk webhook:", error);
+    console.error("========== WEBHOOK ERROR ==========");
+    console.error(error);
+    console.error("===================================");
 
     res.status(400).json({
       message: "Webhook verification failed",
