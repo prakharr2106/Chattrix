@@ -43,7 +43,9 @@ export const useChatStore = create(
                 : null,
           }));
         } catch (error) {
-          console.log("Error in get Users", error.message);
+          console.error("Error in getUsers:", error.message);
+          // Notify user if fetching contacts fails
+          toast.error(error.response?.data?.message || "Failed to load users");
         } finally {
           set({ isUsersLoading: false });
         }
@@ -56,7 +58,11 @@ export const useChatStore = create(
           const res = await axiosInstance.get("/messages/conversations");
           set({ conversations: res.data });
         } catch (error) {
-          console.log("Error in getConversations", error.message);
+          console.error("Error in getConversations:", error.message);
+          // Notify user if fetching conversations fails
+          toast.error(
+            error.response?.data?.message || "Failed to load conversations",
+          );
         } finally {
           set({ isConversationsLoading: false });
         }

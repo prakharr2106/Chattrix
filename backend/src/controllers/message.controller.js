@@ -1,7 +1,7 @@
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import { hasImageKitConfig, uploadChatMedia } from "../lib/imagekit.js";
-import { getReceiverSocketId } from "../lib/socket.js";
+import { getReceiverSocketId, io } from "../lib/socket.js";
 
 export async function getUsersForSidebar(req, res) {
   try {
@@ -58,8 +58,11 @@ export async function getConversationsForSidebar(req, res) {
         },
       },
 
+      // Discard conversations if the partner user record is deleted or missing
+      { $unwind: "$user" },
+
       // Replace the grouped document with the user document
-      { $replaceRoot: { newRoot: { $first: "$user" } } },
+      { $replaceRoot: { newRoot: "$user" } },
 
       // Remove the Clerk ID from the response
       { $project: { clerkId: 0 } },

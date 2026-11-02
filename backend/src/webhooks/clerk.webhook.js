@@ -57,7 +57,8 @@ router.post("/", async (req, res) => {
       const fullName =
         [u.first_name, u.last_name].filter(Boolean).join(" ") ||
         u.username ||
-        email?.split("@")[0];
+        email?.split("@")[0] ||
+        "User";
 
       console.log("User Data:");
       console.log({
@@ -67,16 +68,23 @@ router.post("/", async (req, res) => {
         profilePic: u.image_url,
       });
 
+      // Match by clerkId OR email to update existing records and prevent unique email duplicate key errors
+      const filter = email
+        ? { $or: [{ clerkId: u.id }, { email }] }
+        : { clerkId: u.id };
+
       const savedUser = await User.findOneAndUpdate(
-        { clerkId: u.id },
+        filter,
         {
-          clerkId: u.id,
-          email,
-          fullName,
-          profilePic: u.image_url,
+          $set: {
+            clerkId: u.id,
+            email,
+            fullName,
+            profilePic: u.image_url || "",
+          },
         },
         {
-          new: true,
+          returnDocument: "after",
           upsert: true,
           setDefaultsOnInsert: true,
         },

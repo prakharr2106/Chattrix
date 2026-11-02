@@ -5,11 +5,14 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 
-// Allow requests only from the frontend URL
+// Allow socket connections from frontend in development and production
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 
 const io = new Server(server, {
-  cors: { origin: [allowedOrigin] },
+  cors: {
+    origin: [allowedOrigin, "http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
+  },
 });
 
 // Return the socket ID of a specific user

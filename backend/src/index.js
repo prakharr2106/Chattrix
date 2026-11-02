@@ -35,7 +35,29 @@ app.use(
 // app.use() => middleware
 
 app.use(express.json());
-app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+
+// Support configured frontend URL and common local dev origins with credentials
+const allowedOrigins = [
+  FRONTEND_URL,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        process.env.NODE_ENV !== "production"
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  }),
+);
 app.use(clerkMiddleware()); // integrates Clerk authentication into your Express application
 
 app.get("/health", (req, res) => {

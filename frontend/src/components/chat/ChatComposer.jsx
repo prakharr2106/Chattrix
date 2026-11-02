@@ -100,7 +100,7 @@ export function ChatComposer() {
         <TextArea
           fullWidth
           variant="secondary"
-          placeholder="iMessage"
+          placeholder="Chattrix"
           rows={1}
           value={composerText}
           onChange={handleComposerTextChange}
